@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id         String      @id @default(uuid())
+  name       String
+  domain     String      @unique
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  
+  users      User[]
+  challenges Challenge[]
+  
+  @@map("companies")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  companyId    String
+  name         String
+  email        String
+  passwordHash String?
+  role         String    @default("EMPLOYEE")
+  xp           Int       @default(0)
+  level        Int       @default(1)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  company         Company          @relation(fields: [companyId], references: [id])
+  moodLogs        MoodLog[]
+  userChallenges  UserChallenge[]
+  badges          Badge[]
+  
+  @@unique([email, companyId])
+  @@index([companyId])
+  @@map("users")
+}
+
+model MoodLog {
+  id        String   @id @default(uuid())
+  userId    String
+  mood      Int
+  tags      String   @default("")
+  note      String?
+  loggedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([loggedAt])
+  @@map("mood_logs")
+}
+
+model Challenge {
+  id          String    @id @default(uuid())
+  companyId   String?
+  title       String
+  description String
+  category    String
+  xpReward    Int
+  isGlobal    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  company         Company?         @relation(fields: [companyId], references: [id])
+  userChallenges  UserChallenge[]
+  
+  @@index([companyId])
+  @@index([isGlobal])
+  @@map("challenges")
+}
+
+model UserChallenge {
+  id          String    @id @default(uuid())
+  userId      String
+  challengeId String
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  
+  user      User      @relation(fields: [userId], references: [id])
+  challenge Challenge @relation(fields: [challengeId], references: [id])
+  
+  @@index([userId])
+  @@index([challengeId])
+  @@index([completedAt])
+  @@map("user_challenges")
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  description String
+  iconUrl     String?
+  earnedAt    DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@map("badges")
+}

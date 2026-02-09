@@ -1,0 +1,13 @@
+lifesync-mvp/lifesync-backend/node_modules/
+lifesync-mvp/lifesync-frontend/node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+coverage/
+.vscode/
+.idea/
+prisma/dev.db
+prisma/dev.db-journal
+
