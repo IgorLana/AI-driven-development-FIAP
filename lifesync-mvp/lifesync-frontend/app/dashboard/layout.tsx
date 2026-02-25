@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { Role } from '@/constants/roles';
 
 export default function DashboardLayout({
     children,
@@ -32,6 +33,15 @@ export default function DashboardLayout({
         return null;
     }
 
+    const navLinkClass = (path: string) =>
+        `block px-6 py-3 transition-colors ${pathname === path
+            ? 'bg-blue-100 text-blue-700 font-semibold'
+            : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+        }`;
+
+    // F5 (Fase B) — usa Role const em vez de magic strings 'MANAGER'/'ADMIN'
+    const isManagerOrAdmin = user.role === Role.MANAGER || user.role === Role.ADMIN;
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Sidebar */}
@@ -48,56 +58,27 @@ export default function DashboardLayout({
                 </div>
 
                 <nav className="mt-6">
-                    <Link
-                        href="/dashboard"
-                        className={`block px-6 py-3 transition-colors ${pathname === '/dashboard'
-                            ? 'bg-blue-100 text-blue-700 font-semibold'
-                            : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                            }`}
-                    >
+                    <Link href="/dashboard" className={navLinkClass('/dashboard')}>
                         📊 Dashboard
                     </Link>
-                    <Link
-                        href="/dashboard/mood-logs"
-                        className={`block px-6 py-3 transition-colors ${pathname === '/dashboard/mood-logs'
-                            ? 'bg-blue-100 text-blue-700 font-semibold'
-                            : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                            }`}
-                    >
+                    <Link href="/dashboard/mood-logs" className={navLinkClass('/dashboard/mood-logs')}>
                         😊 Mood Logs
                     </Link>
-                    <Link
-                        href="/dashboard/challenges"
-                        className={`block px-6 py-3 transition-colors ${pathname === '/dashboard/challenges'
-                            ? 'bg-blue-100 text-blue-700 font-semibold'
-                            : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                            }`}
-                    >
+                    <Link href="/dashboard/challenges" className={navLinkClass('/dashboard/challenges')}>
                         🎯 Desafios
                     </Link>
-                    <Link
-                        href="/dashboard/ranking"
-                        className={`block px-6 py-3 transition-colors ${pathname === '/dashboard/ranking'
-                            ? 'bg-blue-100 text-blue-700 font-semibold'
-                            : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                            }`}
-                    >
+                    <Link href="/dashboard/ranking" className={navLinkClass('/dashboard/ranking')}>
                         🏆 Ranking
                     </Link>
-                    {(user.role === 'MANAGER' || user.role === 'ADMIN') && (
-                        <Link
-                            href="/dashboard/analytics"
-                            className={`block px-6 py-3 transition-colors ${pathname === '/dashboard/analytics'
-                                ? 'bg-blue-100 text-blue-700 font-semibold'
-                                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                                }`}
-                        >
+                    {isManagerOrAdmin && (
+                        <Link href="/dashboard/analytics" className={navLinkClass('/dashboard/analytics')}>
                             📈 Analytics
                         </Link>
                     )}
                 </nav>
 
                 <div className="absolute bottom-0 left-0 right-0 p-6">
+                    {/* F2 (Fase A) — logout é async agora (revogação no servidor) */}
                     <button
                         onClick={logout}
                         className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"

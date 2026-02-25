@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
+import Link from 'next/link'; // F8 (Fase B) — client-side navigation com prefetch
 
 export default function DashboardPage() {
     const { user } = useAuth();
@@ -60,23 +61,23 @@ export default function DashboardPage() {
                 <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-md p-6 text-white">
                     <h3 className="text-lg font-bold mb-2">😊 Mood Logs</h3>
                     <p className="text-blue-100 mb-4">Registre como você está se sentindo hoje</p>
-                    <a
+                    <Link
                         href="/dashboard/mood-logs"
                         className="inline-block bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
                     >
                         Ir para Mood Logs
-                    </a>
+                    </Link>
                 </div>
 
                 <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-md p-6 text-white">
                     <h3 className="text-lg font-bold mb-2">🎯 Desafios</h3>
                     <p className="text-green-100 mb-4">Complete desafios e ganhe XP</p>
-                    <a
+                    <Link
                         href="/dashboard/challenges"
                         className="inline-block bg-white text-green-600 px-4 py-2 rounded-lg font-semibold hover:bg-green-50 transition-colors"
                     >
                         Ver Desafios
-                    </a>
+                    </Link>
                 </div>
             </div>
         </div>

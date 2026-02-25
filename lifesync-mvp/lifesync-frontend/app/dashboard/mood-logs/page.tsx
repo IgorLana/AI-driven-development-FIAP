@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { moodLogsAPI } from '@/lib/api';
-import { MoodLog } from '@/types';
+import { MoodLog, PaginatedMoodLogs, ApiError } from '@/types';
 
 const MOOD_EMOJIS = ['😢', '😕', '😐', '🙂', '😄'];
 const MOOD_LABELS = ['Muito Ruim', 'Ruim', 'Neutro', 'Bom', 'Muito Bom'];
@@ -13,19 +13,33 @@ export default function MoodLogsPage() {
     const [note, setNote] = useState('');
     const [history, setHistory] = useState<MoodLog[]>([]);
     const [loading, setLoading] = useState(false);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
+    // F11 (Fase C) — cursor pagination
+    const [historyError, setHistoryError] = useState('');
+    const [nextCursor, setNextCursor] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
 
     useEffect(() => {
         loadHistory();
     }, []);
 
-    const loadHistory = async () => {
+    // F11 (Fase C) — suporte a cursor, acumula registros ao clicar "Carregar mais"
+    const loadHistory = async (cursor?: string) => {
+        setHistoryLoading(true);
+        setHistoryError('');
         try {
-            const response = await moodLogsAPI.getHistory(7);
-            setHistory(response.data.data);
-        } catch (err) {
-            console.error('Erro ao carregar histórico:', err);
+            const response = await moodLogsAPI.getHistory(7, cursor);
+            const { data, nextCursor: nc }: PaginatedMoodLogs = response.data;
+            setHistory((prev) => (cursor ? [...prev, ...data] : data));
+            setNextCursor(nc);
+            setHasMore(nc !== null);
+        } catch {
+            // F7 (Fase B) — feedback visível ao usuário em vez de console.error silencioso
+            setHistoryError('Não foi possível carregar o histórico. Verifique sua conexão.');
+        } finally {
+            setHistoryLoading(false);
         }
     };
 
@@ -48,10 +62,12 @@ export default function MoodLogsPage() {
             setNote('');
             setMood(3);
 
-            // Recarregar histórico
+            // Recarregar histórico do início
             loadHistory();
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Erro ao salvar mood log');
+        } catch (err) {
+            // F4 (Fase B) — ApiError em vez de err: any
+            const apiErr = err as ApiError;
+            setError(apiErr.response?.data?.message ?? 'Erro ao salvar mood log');
         } finally {
             setLoading(false);
         }
@@ -145,9 +161,16 @@ export default function MoodLogsPage() {
 
                 {/* Histórico */}
                 <div className="bg-white rounded-xl shadow-md p-6">
-                    <h2 className="text-xl font-bold text-gray-900 mb-6">Histórico (últimos 7 dias)</h2>
+                    <h2 className="text-xl font-bold text-gray-900 mb-6">Histórico</h2>
 
-                    {history.length === 0 ? (
+                    {/* F7 (Fase B) — erro visível ao usuário */}
+                    {historyError && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+                            {historyError}
+                        </div>
+                    )}
+
+                    {history.length === 0 && !historyError ? (
                         <p className="text-gray-600">Nenhum mood log registrado ainda.</p>
                     ) : (
                         <div className="space-y-4">
@@ -180,6 +203,17 @@ export default function MoodLogsPage() {
                                 </div>
                             ))}
                         </div>
+                    )}
+
+                    {/* F11 (Fase C) — botão "Carregar mais" com cursor pagination */}
+                    {hasMore && (
+                        <button
+                            onClick={() => loadHistory(nextCursor!)}
+                            disabled={historyLoading}
+                            className="mt-4 w-full text-blue-600 border border-blue-300 py-2 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
+                        >
+                            {historyLoading ? 'Carregando...' : 'Carregar mais'}
+                        </button>
                     )}
                 </div>
             </div>

@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import { ApiError } from '@/types';
 
 export default function RegisterPage() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [companyDomain, setCompanyDomain] = useState('acme.com');
+    const [companyDomain, setCompanyDomain] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { register } = useAuth();
@@ -20,8 +21,10 @@ export default function RegisterPage() {
 
         try {
             await register(name, email, password, companyDomain);
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Erro ao registrar');
+        } catch (err) {
+            // F4 (Fase B) — ApiError em vez de err: any
+            const apiErr = err as ApiError;
+            setError(apiErr.response?.data?.message ?? 'Erro ao registrar');
         } finally {
             setLoading(false);
         }

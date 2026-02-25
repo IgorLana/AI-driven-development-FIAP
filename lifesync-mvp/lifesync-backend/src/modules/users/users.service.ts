@@ -1,135 +1,65 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Injectable, NotFoundException, ForbiddenException, Logger, Inject } from '@nestjs/common';
+import { IUserRepository, USER_REPOSITORY } from './repositories/user.repository.interface';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Role } from '../../common/enums/role.enum';
 
+/**
+ * Seção 1.3 (DIP) — UsersService depende de IUserRepository (abstração),
+ * não de PrismaService diretamente.
+ * Seção 1.1 (Magic Strings) — usa Role enum ao invés de strings literais.
+ */
 @Injectable()
 export class UsersService {
     private readonly logger = new Logger(UsersService.name);
 
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        @Inject(USER_REPOSITORY)
+        private readonly userRepository: IUserRepository,
+    ) { }
 
     async findOne(id: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { id },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                xp: true,
-                level: true,
-                createdAt: true,
-                companyId: true,
-            },
-        });
-
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
-
+        const user = await this.userRepository.findById(id);
+        if (!user) throw new NotFoundException('User not found');
         return user;
     }
 
     async findAll(companyId: string, page: number = 1, limit: number = 20, role?: string) {
-        const skip = (page - 1) * limit;
         const take = Math.min(limit, 100);
+        const skip = (page - 1) * take;
 
-        const where: any = { companyId };
-        if (role) {
-            where.role = role;
-        }
-
-        const [users, total] = await Promise.all([
-            this.prisma.user.findMany({
-                where,
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    role: true,
-                    xp: true,
-                    level: true,
-                    createdAt: true,
-                },
-                skip,
-                take,
-                orderBy: { createdAt: 'desc' },
-            }),
-            this.prisma.user.count({ where }),
-        ]);
+        const [users, total] = await this.userRepository.findAllByCompany(companyId, skip, take, role);
 
         return {
             data: users,
-            meta: {
-                page,
-                limit: take,
-                total,
-                totalPages: Math.ceil(total / take),
-            },
+            meta: { page, limit: take, total, totalPages: Math.ceil(total / take) },
         };
     }
 
-    async update(id: string, updateUserDto: UpdateUserDto, currentUserId: string, currentUserRole: string) {
-        // Verificar se usuário existe
-        const user = await this.prisma.user.findUnique({
-            where: { id },
-        });
+    async update(
+        id: string,
+        updateUserDto: UpdateUserDto,
+        currentUserId: string,
+        currentUserRole: string,
+    ) {
+        const user = await this.userRepository.findById(id);
+        if (!user) throw new NotFoundException('User not found');
 
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
-
-        // Verificar permissão: apenas o próprio usuário ou ADMIN pode atualizar
-        if (id !== currentUserId && currentUserRole !== 'ADMIN') {
+        // Seção 1.1 — Usa Role enum ao invés de 'ADMIN' string literal
+        if (id !== currentUserId && currentUserRole !== Role.ADMIN) {
             throw new ForbiddenException('You can only update your own profile');
         }
 
-        const updatedUser = await this.prisma.user.update({
-            where: { id },
-            data: {
-                name: updateUserDto.name?.trim(),
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                xp: true,
-                level: true,
-            },
+        const updatedUser = await this.userRepository.update(id, {
+            name: updateUserDto.name?.trim(),
         });
 
         this.logger.log(`User updated: ${updatedUser.email}`);
-
         return updatedUser;
-    }
-
-    calculateLevel(xp: number): number {
-        return Math.floor(xp / 100) + 1;
     }
 
     async addXP(userId: string, xp: number) {
-        const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-        });
-
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
-
-        const newXP = user.xp + xp;
-        const newLevel = this.calculateLevel(newXP);
-
-        const updatedUser = await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-                xp: newXP,
-                level: newLevel,
-            },
-        });
-
-        this.logger.log(`User ${user.email} gained ${xp} XP. Total: ${newXP}, Level: ${newLevel}`);
-
-        return updatedUser;
+        const result = await this.userRepository.addXP(userId, xp);
+        this.logger.log(`User ${result.email} gained ${xp} XP`);
+        return result;
     }
 }

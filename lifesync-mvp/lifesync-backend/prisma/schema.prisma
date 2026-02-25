@@ -2,6 +2,8 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Seção 5 (Fase 3) — Temporariamente usando SQLite para desenvolvimento
+// Para dev local simples sem Docker
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
@@ -11,8 +13,8 @@ model Company {
   id         String      @id @default(uuid())
   name       String
   domain     String      @unique
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
   
   users      User[]
   challenges Challenge[]
@@ -21,16 +23,18 @@ model Company {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  companyId    String
-  name         String
-  email        String
-  passwordHash String?
-  role         String    @default("EMPLOYEE")
-  xp           Int       @default(0)
-  level        Int       @default(1)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                String    @id @default(uuid())
+  companyId         String    @map("company_id")
+  name              String
+  email             String
+  passwordHash      String?   @map("password_hash")
+  role              String    @default("EMPLOYEE")
+  xp                Int       @default(0)
+  level             Int       @default(1)
+  /// Hash bcrypt do refresh token ativo. NULL = token revogado/logout.
+  refreshTokenHash  String?   @map("refresh_token_hash")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
   
   company         Company          @relation(fields: [companyId], references: [id])
   moodLogs        MoodLog[]
@@ -44,12 +48,12 @@ model User {
 
 model MoodLog {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String   @map("user_id")
   mood      Int
   tags      String   @default("")
   note      String?
-  loggedAt  DateTime @default(now())
-  createdAt DateTime @default(now())
+  loggedAt  DateTime @default(now()) @map("logged_at")
+  createdAt DateTime @default(now()) @map("created_at")
   
   user User @relation(fields: [userId], references: [id])
   
@@ -60,14 +64,14 @@ model MoodLog {
 
 model Challenge {
   id          String    @id @default(uuid())
-  companyId   String?
+  companyId   String?   @map("company_id")
   title       String
   description String
   category    String
-  xpReward    Int
-  isGlobal    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  xpReward    Int       @map("xp_reward")
+  isGlobal    Boolean   @default(false) @map("is_global")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
   
   company         Company?         @relation(fields: [companyId], references: [id])
   userChallenges  UserChallenge[]
@@ -79,10 +83,10 @@ model Challenge {
 
 model UserChallenge {
   id          String    @id @default(uuid())
-  userId      String
-  challengeId String
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
+  userId      String    @map("user_id")
+  challengeId String    @map("challenge_id")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
   
   user      User      @relation(fields: [userId], references: [id])
   challenge Challenge @relation(fields: [challengeId], references: [id])
@@ -95,11 +99,11 @@ model UserChallenge {
 
 model Badge {
   id          String   @id @default(uuid())
-  userId      String
+  userId      String   @map("user_id")
   name        String
   description String
-  iconUrl     String?
-  earnedAt    DateTime @default(now())
+  iconUrl     String?  @map("icon_url")
+  earnedAt    DateTime @default(now()) @map("earned_at")
   
   user User @relation(fields: [userId], references: [id])
   

@@ -7,6 +7,8 @@ import { MoodSummary } from '@/types';
 export default function AnalyticsPage() {
     const [summary, setSummary] = useState<MoodSummary | null>(null);
     const [loading, setLoading] = useState(true);
+    // F7 (Fase B) — erro visível ao usuário em vez de console.error silencioso
+    const [error, setError] = useState('');
 
     useEffect(() => {
         loadSummary();
@@ -16,8 +18,8 @@ export default function AnalyticsPage() {
         try {
             const response = await analyticsAPI.getMoodSummary();
             setSummary(response.data);
-        } catch (err) {
-            console.error('Erro ao carregar analytics:', err);
+        } catch {
+            setError('Não foi possível carregar os dados de analytics. Verifique sua conexão.');
         } finally {
             setLoading(false);
         }
@@ -31,13 +33,15 @@ export default function AnalyticsPage() {
         );
     }
 
-    if (!summary) {
+    if (error) {
         return (
-            <div className="text-center text-gray-600">
-                Erro ao carregar dados de analytics.
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-8 rounded-xl text-center">
+                {error}
             </div>
         );
     }
+
+    if (!summary) return null;
 
     const moodEmojis = ['😢', '😕', '😐', '🙂', '😄'];
 

@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import { ApiError } from '@/types';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    // F1 (Fase A) — companyDomain obrigatório para isolamento multi-tenant
+    const [companyDomain, setCompanyDomain] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
@@ -17,9 +20,11 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            await login(email, password);
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Erro ao fazer login');
+            await login(email, password, companyDomain);
+        } catch (err) {
+            // F4 (Fase B) — ApiError em vez de err: any
+            const apiErr = err as ApiError;
+            setError(apiErr.response?.data?.message ?? 'Erro ao fazer login');
         } finally {
             setLoading(false);
         }
@@ -34,6 +39,21 @@ export default function LoginPage() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    <div>
+                        <label htmlFor="companyDomain" className="block text-sm font-medium text-gray-700 mb-2">
+                            Domínio da Empresa
+                        </label>
+                        <input
+                            id="companyDomain"
+                            type="text"
+                            value={companyDomain}
+                            onChange={(e) => setCompanyDomain(e.target.value)}
+                            required
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="acme.com"
+                        />
+                    </div>
+
                     <div>
                         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                             Email
@@ -85,15 +105,6 @@ export default function LoginPage() {
                         <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
                             Registre-se
                         </Link>
-                    </p>
-                </div>
-
-                <div className="mt-8 pt-6 border-t border-gray-200">
-                    <p className="text-sm text-gray-500 text-center">
-                        <strong>Credenciais de teste:</strong><br />
-                        Employee: joao@acme.com / password123<br />
-                        Manager: manager@acme.com / password123<br />
-                        Admin: admin@acme.com / password123
                     </p>
                 </div>
             </div>

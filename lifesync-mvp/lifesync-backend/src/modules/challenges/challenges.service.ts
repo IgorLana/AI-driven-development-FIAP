@@ -1,128 +1,71 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CHALLENGE_REPOSITORY, IChallengeRepository } from './repositories/challenge.repository.interface';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
-import { UsersService } from '../users/users.service';
-import { GamificationService } from '../gamification/gamification.service';
-import { startOfDay, endOfDay } from 'date-fns';
+import { ChallengeCompletedEvent } from '../../common/events/challenge-completed.event';
 
+/**
+ * Seção 1.2 — Desacoplamento via EventEmitter.
+ * ChallengesService não importa mais UsersService nem GamificationService.
+ */
 @Injectable()
 export class ChallengesService {
     private readonly logger = new Logger(ChallengesService.name);
 
     constructor(
-        private prisma: PrismaService,
-        private usersService: UsersService,
-        private gamificationService: GamificationService,
+        @Inject(CHALLENGE_REPOSITORY)
+        private readonly challengeRepository: IChallengeRepository,
+        private readonly eventEmitter: EventEmitter2,
     ) { }
 
     async create(companyId: string, createChallengeDto: CreateChallengeDto) {
-        const challenge = await this.prisma.challenge.create({
-            data: {
-                companyId,
-                title: createChallengeDto.title,
-                description: createChallengeDto.description,
-                category: createChallengeDto.category,
-                xpReward: createChallengeDto.xpReward,
-                isGlobal: false,
-            },
+        const challenge = await this.challengeRepository.create({
+            companyId,
+            title: createChallengeDto.title,
+            description: createChallengeDto.description,
+            category: createChallengeDto.category,
+            xpReward: createChallengeDto.xpReward,
         });
 
         this.logger.log(`Challenge created: ${challenge.title} for company ${companyId}`);
-
         return challenge;
     }
 
     async findDaily(userId: string, companyId: string) {
-        // Buscar desafios globais e da empresa
-        const challenges = await this.prisma.challenge.findMany({
-            where: {
-                OR: [
-                    { isGlobal: true },
-                    { companyId },
-                ],
-            },
-            orderBy: [
-                { category: 'asc' },
-                { xpReward: 'desc' },
-            ],
-        });
+        const challenges = await this.challengeRepository.findAvailable(companyId);
+        const completedToday = await this.challengeRepository.findCompletedTodayByUser(userId);
 
-        // Buscar desafios já completados hoje
-        const today = new Date();
-        const completedToday = await this.prisma.userChallenge.findMany({
-            where: {
-                userId,
-                completedAt: {
-                    gte: startOfDay(today),
-                    lte: endOfDay(today),
-                },
-            },
-            select: {
-                challengeId: true,
-            },
-        });
+        const completedIds = new Set(completedToday.map((uc) => uc.challengeId));
+        const availableChallenges = challenges.filter((c) => !completedIds.has(c.id));
 
-        const completedChallengeIds = new Set(completedToday.map((uc) => uc.challengeId));
-
-        // Filtrar desafios já completados
-        const availableChallenges = challenges.filter(
-            (challenge) => !completedChallengeIds.has(challenge.id),
-        );
-
-        return {
-            challenges: availableChallenges,
-        };
+        return { challenges: availableChallenges };
     }
 
     async complete(userId: string, challengeId: string) {
-        // Verificar se desafio existe
-        const challenge = await this.prisma.challenge.findUnique({
-            where: { id: challengeId },
-        });
-
+        const challenge = await this.challengeRepository.findById(challengeId);
         if (!challenge) {
             throw new NotFoundException('Challenge not found');
         }
 
-        // Verificar se já completou hoje
-        const today = new Date();
-        const existingCompletion = await this.prisma.userChallenge.findFirst({
-            where: {
-                userId,
-                challengeId,
-                completedAt: {
-                    gte: startOfDay(today),
-                    lte: endOfDay(today),
-                },
-            },
-        });
-
-        if (existingCompletion) {
+        const completedToday = await this.challengeRepository.findCompletedTodayByUser(userId);
+        const alreadyCompleted = completedToday.some((uc) => uc.challengeId === challengeId);
+        if (alreadyCompleted) {
             throw new BadRequestException('Challenge already completed today');
         }
 
-        // Criar UserChallenge
-        await this.prisma.userChallenge.create({
-            data: {
-                userId,
-                challengeId,
-                completedAt: new Date(),
-            },
-        });
+        await this.challengeRepository.createCompletion(userId, challengeId);
 
-        // Adicionar XP
-        const updatedUser = await this.usersService.addXP(userId, challenge.xpReward);
-
-        // Verificar badge "Mestre do Bem-Estar"
-        await this.gamificationService.checkChallengesMasterBadge(userId);
+        // Seção 1.2 — Emite evento: Gamification e Users reagem de forma desacoplada
+        this.eventEmitter.emit(
+            'challenge.completed',
+            new ChallengeCompletedEvent(userId, challengeId, challenge.xpReward),
+        );
 
         this.logger.log(`Challenge completed: ${challenge.title} by user ${userId}`);
 
         return {
             challenge,
             xpEarned: challenge.xpReward,
-            totalXP: updatedUser.xp,
-            newLevel: updatedUser.level,
         };
     }
 }

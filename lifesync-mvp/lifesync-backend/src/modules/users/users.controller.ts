@@ -12,11 +12,10 @@ import {
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { Role } from '../../common/enums/role.enum';
+import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 
+// Seção 1 (Fase 5) — Substitui `user: any` por `AuthenticatedUser` tipado
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
@@ -24,16 +23,16 @@ export class UsersController {
 
     @Get('me')
     @HttpCode(HttpStatus.OK)
-    async getMe(@CurrentUser() user: any) {
+    async getMe(@CurrentUser() user: AuthenticatedUser) {
         return this.usersService.findOne(user.id);
     }
 
     @Get()
     @HttpCode(HttpStatus.OK)
     async findAll(
-        @CurrentUser() user: any,
-        @Query('page') page?: number,
-        @Query('limit') limit?: number,
+        @CurrentUser() user: AuthenticatedUser,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
         @Query('role') role?: string,
     ) {
         return this.usersService.findAll(
@@ -49,7 +48,7 @@ export class UsersController {
     async update(
         @Param('id') id: string,
         @Body() updateUserDto: UpdateUserDto,
-        @CurrentUser() user: any,
+        @CurrentUser() user: AuthenticatedUser,
     ) {
         return this.usersService.update(id, updateUserDto, user.id, user.role);
     }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { challengesAPI } from '@/lib/api';
-import { Challenge } from '@/types';
+import { Challenge, ApiError } from '@/types';
 
 const CATEGORY_EMOJIS: Record<string, string> = {
     PHYSICAL: '💪',
@@ -16,6 +16,8 @@ export default function ChallengesPage() {
     const [loading, setLoading] = useState(true);
     const [completing, setCompleting] = useState<string | null>(null);
     const [success, setSuccess] = useState('');
+    // F6 (Fase B) — estado de erro inline em vez de alert()
+    const [error, setError] = useState('');
 
     useEffect(() => {
         loadChallenges();
@@ -26,7 +28,9 @@ export default function ChallengesPage() {
             const response = await challengesAPI.getDaily();
             setChallenges(response.data.challenges);
         } catch (err) {
-            console.error('Erro ao carregar desafios:', err);
+            // F4 (Fase B) — ApiError em vez de err: any
+            const apiErr = err as ApiError;
+            setError(apiErr.response?.data?.message ?? 'Erro ao carregar desafios');
         } finally {
             setLoading(false);
         }
@@ -35,18 +39,17 @@ export default function ChallengesPage() {
     const handleComplete = async (id: string) => {
         setCompleting(id);
         setSuccess('');
+        setError('');
 
         try {
             const response = await challengesAPI.complete(id);
             setSuccess(`Desafio completado! +${response.data.xpEarned} XP`);
-
-            // Remover desafio da lista
             setChallenges(challenges.filter((c) => c.id !== id));
-
-            // Limpar mensagem após 3s
             setTimeout(() => setSuccess(''), 3000);
-        } catch (err: any) {
-            alert(err.response?.data?.message || 'Erro ao completar desafio');
+        } catch (err) {
+            // F6 (Fase B) — feedback inline estilizado, sem alert()
+            const apiErr = err as ApiError;
+            setError(apiErr.response?.data?.message ?? 'Erro ao completar desafio');
         } finally {
             setCompleting(null);
         }
@@ -70,7 +73,13 @@ export default function ChallengesPage() {
                 </div>
             )}
 
-            {challenges.length === 0 ? (
+            {error && (
+                <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                    {error}
+                </div>
+            )}
+
+            {challenges.length === 0 && !error ? (
                 <div className="bg-white rounded-xl shadow-md p-8 text-center">
                     <div className="text-6xl mb-4">🎉</div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">
